@@ -1,363 +1,454 @@
-# 💡 PostureFix AI --- Personalized AI Posture Monitor
-
-A real-time, webcam-based posture monitoring system that learns each
-user's individual sitting posture through a short calibration process,
-builds a personalized K-Nearest Neighbors (KNN) classifier, and provides
-stable live posture feedback.
+# PostureFix AI – Personalized Real-Time Posture Monitoring
 
 ![PostureFix AI Cover](media/posturefixai_cover_realistic.png)
 
-## Table of Contents
+## Project Description
 
--   [The Team](#-the-team)
--   [Project Description](#-project-description)
--   [Getting Started](#-getting-started)
--   [Prerequisites](#-prerequisites)
--   [Installing](#️-installing)
--   [Testing](#-testing)
--   [Deployment](#-deployment)
--   [Built With](#️-built-with)
--   [Acknowledgments](#-acknowledgments)
+PostureFix AI is a personalized real-time posture monitoring system that uses a standard webcam to detect poor sitting posture and provide interpretable corrective feedback.
 
-## 👥 The Team
+The system is designed to account for individual differences in natural sitting posture. Instead of relying on a single posture model for all users, each user performs a short calibration session that provides the user-specific reference samples used by a personalized K-Nearest Neighbors (KNN) classifier.
 
-**Team Members** - Shirel Mimoun - Ester Fradkin
+The complete pipeline includes:
 
-**Supervisor** - Gal Katzhendler
+- guided personalized posture calibration,
+- guided frame labeling and posture segmentation,
+- MediaPipe-based pose estimation,
+- geometric feature extraction,
+- shared feature selection across personalized users,
+- personalized KNN training and evaluation,
+- real-time posture classification,
+- temporal stabilization of posture predictions,
+- model-aware personalized corrective feedback.
 
-## 📚 Project Description
+The final personalized classifier uses a compact seven-feature representation selected through backward sequential feature elimination.
 
-PostureFix AI is a personalized posture-monitoring system designed to
-detect poor sitting posture during computer use without requiring
-wearable sensors. The system uses a standard webcam to observe the
-user's head and shoulders, extracts posture-related landmarks and
-geometric features, and classifies each frame as **Good** or **Bad**
-posture.
+---
 
-Unlike a fixed posture detector, the personalized system first performs
-an automatic calibration for each user. During calibration, the user is
-guided through examples of good and bad posture. The recorded frames are
-automatically labeled and divided into posture segments. MediaPipe Pose
-landmarks are then extracted from the frames and converted into
-geometric and landmark-based features.
+## System Demonstration
 
-A personalized KNN model is trained using only that user's calibration
-data. Hyperparameters are selected using group-based cross-validation,
-where `Segment_ID` is used to keep frames from the same recorded posture
-segment together and reduce data leakage. A separate set of complete
-posture segments is held out for evaluation.
+A video demonstration of the complete PostureFix AI system, including personalized
+calibration, real-time posture monitoring, and corrective feedback, is available here:
 
-During live monitoring, the same feature-extraction pipeline is applied
-to webcam frames. The trained personal model predicts Good or Bad
-posture, temporal smoothing prevents unstable frame-by-frame warnings,
-and a personalized feedback module attempts to identify the posture
-issue and display a corrective message.
+[▶ Watch the PostureFix AI Demo](https://drive.google.com/file/d/1ODnbpZYtLPPaPkcnGPIszOWj7yEXfLGM/view)
 
-### Main Features
+## System Pipeline
 
--   Automatic webcam-based personalized calibration.
--   Guided **Good** and **Bad** posture examples using reference images.
--   Additional natural-reading calibration segment for collecting
-    realistic Good-posture variation.
--   Automatic frame labeling with `Label` and `Segment_ID`.
--   MediaPipe Pose landmark extraction.
--   Geometric posture features based mainly on the head, eyes, ears, and
-    shoulders.
--   Personalized KNN classification for each user.
--   Median imputation for missing feature values.
--   Standardization using `StandardScaler`.
--   Segment-based train/test separation.
--   Group-based cross-validation for KNN hyperparameter selection.
--   Evaluation using accuracy, classification reports, confusion
-    matrices, and permutation importance.
--   Saving of Bad-posture frames that were incorrectly classified as
-    Good for error analysis.
--   Real-time webcam monitoring.
--   Temporal smoothing of posture predictions.
--   Personalized corrective feedback for detected posture problems.
+The personalized pipeline consists of the following stages:
 
-### Posture Feedback
+1. **Calibration**
 
-The current feedback module can identify patterns associated with:
+   The user performs guided examples of Good and Bad sitting posture.
 
--   Uneven/asymmetric shoulders.
--   Rounded upper back / raised shoulders.
--   Head or upper body lowered.
--   Head tilted upward.
--   Raised shoulders.
--   Head leaning left or right.
--   Head turning left or right.
--   Forward-head posture.
+   A natural reading stage is also recorded to capture realistic movement while maintaining correct posture.
 
-Feedback is derived from the user's calibration statistics rather than
-from the KNN class label alone.
+   Calibration frames are automatically labeled and grouped into posture segments.
 
-### Main Components
+2. **Dataset Construction**
 
-  --------------------------------------------------------------------------------
-  Component                                    Purpose
-  -------------------------------------------- -----------------------------------
-  `main.py`                                    Entry point and user-specific
-                                               pipeline management.
+   MediaPipe Pose is applied to each valid calibration frame.
 
-  `calibration/frame_extraction.py`            Runs guided webcam calibration,
-                                               records frames, and creates
-                                               automatic labels and segment IDs.
+   Pose landmarks are converted into interpretable geometric posture features using the shared feature-extraction module.
 
-  `calibration/create_user_dataset.py`         Runs MediaPipe Pose on calibration
-                                               frames and creates the user's Excel
-                                               dataset.
+3. **Feature Selection**
 
-  `features/feature_extraction.py`             Extracts geometric posture features
-                                               and raw landmark coordinates.
+   A shared feature representation is selected across personalized users using backward sequential feature elimination.
 
-  `training/train_personal_model.py`           Splits data by posture segments,
-                                               performs GroupKFold hyperparameter
-                                               search, evaluates the model, and
-                                               trains the final personal KNN
-                                               model.
+   Feature subsets are evaluated using segment-grouped cross-validation, while the held-out test segments remain excluded from the feature-selection process.
 
-  `training/permutation_importance.py`         Measures feature importance on the
-                                               unseen test split.
+4. **Personalized Model Training**
 
-  `training/feature_selection_experiment.py`   Supports correlation analysis and
-                                               backward feature-selection
-                                               experiments across personalized
-                                               users.
+   A separate KNN classifier is trained for each user.
 
-  `features/posture_feedback.py`               Generates personalized explanations
-                                               for detected Bad posture.
+   Hyperparameters are selected using `StratifiedGroupKFold`, where `Segment_ID` is used as the grouping variable.
 
-  `live/live_monitoring.py`                    Performs real-time feature
-                                               extraction, KNN inference, temporal
-                                               smoothing, and feedback display.
-  --------------------------------------------------------------------------------
+   Median imputation and feature standardization are fitted independently inside each training fold.
 
-### Calibration Output
+5. **Held-Out Evaluation**
 
-For each user, the pipeline creates data similar to:
+   Complete posture segments are reserved for final evaluation.
 
-``` text
-users/<user_id>/
-├── frames/
-├── labels.csv
-├── calibration_dataset.xlsx
-├── landmark_checks/
-└── evaluation/
+   This prevents temporally related frames from the same recorded posture segment from appearing in both model development and final evaluation.
+
+6. **Final Model Refit**
+
+   After evaluation is complete, the selected preprocessing pipeline and KNN configuration are refitted using the complete calibration dataset.
+
+   This final model is saved for real-time inference.
+
+7. **Live Monitoring**
+
+   Webcam frames are processed continuously using the same MediaPipe and feature-extraction pipeline used during training.
+
+   Frame-level KNN predictions are stabilized using time-based posture-state logic.
+
+8. **Personalized Feedback**
+
+   For persistent Bad posture, the system analyzes the local geometry of the personalized KNN model to determine which posture characteristics provide the strongest evidence for the current prediction.
+
+   Supplementary personalized geometric diagnostics, such as shoulder asymmetry, may also provide corrective guidance without modifying or explaining the KNN classification itself.
+
+---
+
+## Final Personalized Features
+
+The final KNN classifier uses the following seven features:
+
+- `earCenterHeightNorm`
+- `eyeCenterHeightNorm`
+- `eyeWidth`
+- `headForwardDepth`
+- `headHeight`
+- `leftEar_y`
+- `rightEye_y`
+
+The shared seven-feature subset was selected using backward sequential feature elimination across 11 personalized users. 
+For each user, feature selection was performed exclusively on the Train/CV data, while the held-out test segments remained excluded from the selection process.
+
+---
+
+## Project Structure
+
+```text
+.
+├── assets/
+│   └── calibration_images/
+│       └── Reference posture images used during guided calibration
+│
+├── calibration/
+│   ├── frame_extraction.py
+│   │   └── Guided calibration and automatic frame labeling
+│   │
+│   └── create_user_dataset.py
+│       └── Creation of the personalized feature dataset
+│
+├── features/
+│   ├── feature_extraction.py
+│   │   └── Shared geometric feature extraction for training and inference
+│   │
+│   └── posture_feedback_model_aware.py
+│       └── Personalized model-aware corrective feedback
+│
+├── live/
+│   └── live_monitoring.py
+│       └── Real-time personalized posture inference and feedback
+│
+├── training/
+│   ├── train_personal_model.py
+│   │   └── Personalized KNN training, validation, and evaluation
+│   │
+│   └── feature_selection_experiment.py
+│       └── Shared backward sequential feature selection
+│
+├── media/
+│   └── posturefixai_cover_realistic.png
+│       └── Project cover image
+│
+├── main.py
+│   └── End-to-end interactive application pipeline
+│
+├── .gitignore
+└── README.md
 ```
 
-The trained model is stored under:
+---
 
-``` text
-models/user_models/<user_id>_personal_knn.joblib
-```
+## Technologies
 
-### Personal Calibration Guidelines
+The project is implemented in Python and uses:
 
-For better calibration quality:
+- OpenCV
+- MediaPipe Pose
+- NumPy
+- Pandas
+- scikit-learn
+- Matplotlib
+- Joblib
 
--   Use a simple background with good contrast against your clothing,
-    for example a light wall with a dark shirt.
--   Make sure your head, neck, and shoulders remain clearly visible.
--   Use good, even lighting and avoid strong backlighting.
--   During **Good posture** examples, sit naturally and make only small,
-    gentle movements that represent realistic variations of healthy
-    posture.
--   During **Bad posture** examples, perform the requested posture
-    clearly but naturally. Do not exaggerate the movement or move into
-    pain or significant discomfort.
--   Keep a clear distinction between Good and Bad examples.
--   Do not remain completely frozen; small natural variations help the
-    model learn a realistic range of postures.
+The machine-learning component uses a personalized K-Nearest Neighbors classifier together with median imputation and feature standardization.
 
-## ⚡ Getting Started
+---
 
-These instructions run the personalized PostureFix AI pipeline on a
-local machine with a webcam.
+## Installation
 
-### 🧱 Prerequisites
-
--   Python 3.11
--   A working webcam
--   `pip`
--   A desktop environment capable of displaying OpenCV windows
-
-The project currently depends on the following main Python packages:
-
--   OpenCV (`opencv-python`)
--   MediaPipe
--   NumPy
--   pandas
--   scikit-learn
--   joblib
--   matplotlib
--   openpyxl
-
-### 🏗️ Installing
+Recommended environment: **Python 3.11**.
 
 Clone the repository:
 
-``` bash
-git clone https://github.cs.huji.ac.il/shirlel25/Personalized-PostureFix-AI.git
+```bash
+git clone git@github.cs.huji.ac.il:shirlel25/Personalized-PostureFix-AI.git
 cd Personalized-PostureFix-AI
-```
-
-It is recommended to create a virtual environment:
-
-``` bash
-python3.11 -m venv .venv
-source .venv/bin/activate
 ```
 
 Install the required Python packages:
 
-``` bash
-pip install opencv-python mediapipe numpy pandas scikit-learn joblib matplotlib openpyxl
+```bash
+pip install numpy pandas opencv-python mediapipe scikit-learn matplotlib joblib openpyxl
 ```
 
-Make sure the calibration reference images exist in:
+A webcam is required for calibration and live monitoring.
 
-``` text
-assets/calibration_images/good/
-assets/calibration_images/bad/
-```
+---
 
-Run the application from the project root:
+## Running the Project
 
-``` bash
+Run the application from the repository root:
+
+```bash
 python main.py
 ```
 
-Enter a user name or ID when prompted. The program then provides the
-following options:
+The application asks for a user name or ID and then presents the available actions.
 
-1.  Run a new calibration, recreate the dataset, and train a new model.
-2.  Recreate the dataset from existing frames and labels and retrain the
-    model.
-3.  Train or retrain from an existing calibration dataset.
-4.  Start live monitoring using an existing personal model.
-5.  Switch to a different user.
-6.  Exit.
+### Available Workflows
 
-For a new user, choose option **1**. The system will guide the user
-through calibration, build the dataset, train and evaluate the
-personalized KNN model, save it, and then start live monitoring.
+#### 1. New calibration
 
-Press **`q`** in an OpenCV camera window to stop the active calibration
-or monitoring session.
+Runs the complete personalized pipeline:
 
-## 🧪 Testing
-
-The personalized model is evaluated automatically during training.
-
-The dataset is first split by complete `Segment_ID` groups.
-Approximately 25% of the posture segments from each label are reserved
-as an unseen test set. The remaining segments form the Train/CV pool.
-
-KNN hyperparameters are selected on the Train/CV pool using
-`GroupKFold`. The current search evaluates combinations of:
-
-``` text
-K: 3, 5, 7, 9, 11, 15, 21, 31, 41, 51
-Weights: uniform, distance
-Distance metrics: euclidean, manhattan
+```text
+Calibration
+    ↓
+Dataset construction
+    ↓
+Personalized model training
+    ↓
+Held-out evaluation
+    ↓
+Final model refit
+    ↓
+Live monitoring
 ```
 
-Imputation and scaling are fitted separately inside each
-cross-validation fold.
+#### 2. Recreate the dataset and retrain
 
-After hyperparameter selection, the selected model is evaluated once on
-the held-out test segments. The evaluation folder can contain:
+Previously recorded calibration frames and labels are reused to regenerate the feature dataset and retrain the personalized model.
 
-``` text
-evaluation/
-├── classification_report.txt
-├── metrics_summary.csv
-├── confusion_matrix.png
-├── split_summary.txt
-├── hyperparameter_selection/
-│   ├── group_cv_search_results.csv
-│   └── K_vs_group_cv_accuracy.png
-├── feature_importance/
-│   ├── permutation_importance.csv
-│   └── permutation_importance_top20.png
-└── misclassified/
-    └── bad_predicted_good/
+#### 3. Retrain from an existing dataset
+
+The existing calibration feature dataset is used directly for personalized model training.
+
+#### 4. Live monitoring
+
+An existing personalized model is loaded and used for real-time posture monitoring.
+
+---
+
+## Personalized Calibration
+
+During a new calibration session, the system records three types of posture behavior:
+
+### Good Posture
+
+The user follows guided reference images demonstrating correct sitting posture.
+
+### Natural Good-Posture Reading
+
+The user reads text while maintaining comfortable Good posture.
+
+This stage introduces natural head and upper-body movement into the Good calibration data.
+
+### Bad Posture
+
+The user follows guided examples of poor sitting posture.
+
+Each guided posture is stored as a separate `Segment_ID`.
+
+The reading stage is also divided into temporal subsegments.
+
+This segment structure is later used to prevent frames belonging to the same recorded posture instance from being divided between training and evaluation.
+
+---
+
+## Feature Extraction
+
+MediaPipe Pose landmarks are extracted from each calibration and live webcam frame.
+
+The shared feature-extraction module computes interpretable geometric descriptors including:
+
+- head position,
+- head height,
+- forward-head displacement,
+- eye and ear geometry,
+- shoulder alignment,
+- relative head and shoulder orientation,
+- selected landmark coordinates and normalized geometric descriptors.
+
+Several measurements are normalized by shoulder width to reduce sensitivity to body size and user-camera distance.
+
+The same feature-extraction implementation is used during both dataset creation and live inference to maintain consistency between training and deployment.
+
+---
+
+## Model Training and Evaluation
+
+For each personalized user, complete posture segments are first divided into:
+
+```text
+Train/CV segments
+Held-out test segments
 ```
 
-### Sample Test
+The held-out segments are not used for model selection.
 
-To perform a complete end-to-end test:
+KNN hyperparameters are selected exclusively from the Train/CV pool using `StratifiedGroupKFold`.
 
-``` bash
-python main.py
+The hyperparameter search evaluates:
+
+- K ∈ {3, 5, 7, 9, 11, 15, 21, 31, 41, 51}
+- weights ∈ {uniform, distance}
+- metric ∈ {Euclidean, Manhattan}
+
+Within each cross-validation fold:
+
+```text
+Training fold
+    ↓
+Median imputation
+    ↓
+Standardization
+    ↓
+KNN fitting
+    ↓
+Validation fold evaluation
 ```
 
-Then:
+Hyperparameter configurations are ranked primarily by Balanced Accuracy, followed by Bad-class F1 and cross-validation stability.
 
-1.  Enter a new test user ID.
-2.  Select **Run new calibration**.
-3.  Complete the Good, natural-reading, and Bad posture calibration
-    stages.
-4.  Verify that `labels.csv` and `calibration_dataset.xlsx` are created.
-5.  Verify that training finishes and a `.joblib` personal model is
-    saved.
-6.  Review the generated evaluation results.
-7.  Confirm that live monitoring starts and changes between stable Good
-    and Bad states as posture changes.
-8.  Check that Bad posture produces an appropriate corrective feedback
-    message.
+The selected configuration is then evaluated once on the held-out posture segments.
 
-The `landmark_checks` directory can also be inspected to verify that
-MediaPipe detected the expected body landmarks in the calibration
-frames.
+Reported evaluation metrics include:
 
-## 🚀 Deployment
+- Accuracy
+- Balanced Accuracy
+- Bad-class Recall
+- Bad-class F1
+- Classification Report
+- Confusion Matrix
 
-The current version is designed as a **local desktop prototype** rather
-than a production web or cloud service.
+After evaluation, the final deployment model is refitted using all available calibration samples.
 
-The application runs locally and requires:
+---
 
--   Access to a webcam.
--   The project source code and Python environment.
--   A completed calibration and trained personal model for the selected
-    user.
+## Feature Selection
 
-All personalized calibration data and trained models are stored locally
-in the project's `users/` and `models/user_models/` directories.
+The feature extractor produces 55 candidate model-input features. Before backward elimination, 
+four projection-based features are removed because their geometric definitions make them structurally 
+redundant with each other and with `shoulderTilt`, leaving 51 candidate features.
 
-For future deployment, the pipeline could be packaged as a desktop
-application and the calibration, training, and monitoring interfaces
-could be integrated into a graphical user interface.
+Backward sequential feature elimination was then performed jointly across the 11 personalized users, 
+reducing the shared representation from 51 candidate features to the final seven-feature subset.
 
-## ⚙️ Built With
+For every candidate feature subset:
 
--   [Python](https://www.python.org/) --- Main programming language.
--   [OpenCV](https://opencv.org/) --- Webcam capture, calibration
-    interface, frame handling, and live visualization.
--   [MediaPipe
-    Pose](https://ai.google.dev/edge/mediapipe/solutions/vision/pose_landmarker)
-    --- Human pose landmark detection.
--   [scikit-learn](https://scikit-learn.org/) --- KNN classification,
-    preprocessing, cross-validation, evaluation, and permutation
-    importance.
--   [pandas](https://pandas.pydata.org/) --- Dataset creation and
-    manipulation.
--   [NumPy](https://numpy.org/) --- Numerical and geometric
-    calculations.
--   [Matplotlib](https://matplotlib.org/) --- Evaluation and
-    feature-importance plots.
--   [joblib](https://joblib.readthedocs.io/) --- Serialization of
-    trained personalized models.
+- each user is evaluated independently,
+- posture segments remain grouped during cross-validation,
+- preprocessing is fitted only on the corresponding training fold,
+- KNN hyperparameters are re-optimized,
+- user-level results are aggregated with equal weighting across users.
 
-## 🙏 Acknowledgments
+The held-out test segments are excluded from the entire feature-selection process.
 
--   The project was developed as part of the Electrical Engineering and
-    Computer Science program at the Hebrew University of Jerusalem.
--   Special thanks to project supervisor **Gal Katzhendler** for
-    guidance and feedback.
--   Thanks to the participants who contributed posture calibration data
-    used during the development and evaluation of the system.
--   The project uses the open-source MediaPipe, OpenCV, and scikit-learn
-    ecosystems.
+The final representation is selected from the evaluated backward-elimination trajectory according to:
+
+1. Mean Balanced Accuracy
+2. Mean Bad-class F1
+3. Between-user performance variability
+4. Number of features as a final tie-breaker
+
+---
+
+## Real-Time Monitoring
+
+During live monitoring:
+
+1. A mirrored webcam frame is acquired.
+2. MediaPipe Pose landmarks are detected.
+3. The shared geometric features are extracted.
+4. The fitted imputer and scaler are applied.
+5. The personalized KNN predicts Good or Bad posture.
+6. A time-based smoothing mechanism stabilizes the raw prediction.
+7. Persistent Bad posture activates personalized corrective feedback.
+8. Feedback messages are temporally stabilized before being displayed.
+
+Using elapsed time rather than a fixed number of frames makes the state logic less dependent on the effective processing frame rate.
+
+---
+
+## Personalized Feedback
+
+The primary corrective-feedback mechanism is model-aware.
+
+For a frame classified as Bad, the system:
+
+1. reproduces the preprocessing used by the personalized classifier,
+2. examines nearby Good and Bad calibration samples in the KNN feature space,
+3. compares their feature-wise distances to the current posture,
+4. estimates local feature evidence,
+5. groups related features into interpretable posture categories,
+6. generates a personalized corrective message.
+
+The current model-aware groups include:
+
+- forward-head posture,
+- vertical head posture,
+- head orientation.
+
+The system may additionally evaluate selected geometric quantities that are not part of the classifier.
+
+For example, `shoulderTilt` is compared with the user's calibrated Good-posture reference to detect unusual shoulder asymmetry.
+
+Such supplementary diagnostics do **not** participate in the KNN decision and are not interpreted as explanations of the classifier prediction.
+
+---
+
+## Evaluation Summary
+
+The final personalized evaluation was performed on held-out posture segments from 11 users, comprising 2,496 test frames. 
+The personalized pipeline achieved 87.10% pooled accuracy and 86.88% weighted F1-score.
+
+The earlier generalized model achieved 78.87% accuracy on a participant-independent test set of 2,471 frames from unseen users. 
+Because the generalized and personalized systems were evaluated under different protocols, these results should not be interpreted 
+as a controlled head-to-head comparison.
+
+## Output Files
+
+For each user, the application creates a user-specific directory containing calibration and evaluation artifacts.
+
+Example:
+
+```text
+users/
+└── <user_id>/
+    ├── frames/
+    ├── labels.csv
+    ├── calibration_dataset.xlsx
+    ├── landmark_checks/
+    └── evaluation/
+```
+
+Personalized trained models are stored under:
+
+```text
+models/
+└── user_models/
+    └── <user_id>_personal_knn.joblib
+```
+
+---
+
+## Authors
+
+**Shirel Maimon**  
+**Ester Fradkin**
+
+The Hebrew University of Jerusalem
+
+---
+
+## Acknowledgments
+
+This project was developed as an academic project at the Hebrew University of Jerusalem.
+
+We would like to thank our advisor and mentor, Gal Katzhendler, for his guidance and support throughout the project, and Nir Sweed for his valuable assistance and contributions.
+
+The implementation uses MediaPipe Pose for body-landmark estimation and scikit-learn for personalized KNN modeling and evaluation.
